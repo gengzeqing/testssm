@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.3.xsd
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd
+  http://www.springframework.org/schema/aop            
+           http://www.springframework.org/schema/aop/spring-aop-3.1.xsd" 
+          >
+    <!-- 启用AOP注解 -->
+    <aop:aspectj-autoproxy proxy-target-class="true"/>
+	<!-- 引入配置文件 -->
+	<bean id="propertyConfigurer"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="location" value="classpath:jdbc.properties" />
+	</bean>
+
+	<!-- spring和MyBatis整合，不需要mybatis的配置映射文件 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<!-- 自动扫描mapping.xml文件 -->
+		<property name="mapperLocations" value="classpath*:com/cs/test/dao/mapper/*.xml"></property>
+	</bean>
+
+	<!-- DAO接口所在包名，Spring会自动查找其下的类 动态代理实现 不用写dao的实现类 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.cs.test.dao" />
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+	</bean>
+
+	<!-- (事务管理)transaction manager, use JtaTransactionManager for global tx -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- spring使用 <tx:advice>和 <aop:config> 来配置事务 -->
+	<!-- 每一个 模块都有自己的 tx:advice 命名规则是 模块名 加 advice -->
+	<!-- transaction-manager 的意思是管理者 这个模块下事务的管理者是 transaction-manager = 配置的事务 -->
+	<tx:advice id="serviceAdvice" transaction-manager="transactionManager">
+		<!-- tx:attributes 指定具体需要拦截的方法 -->
+		<tx:attributes>
+			<!-- name:表示拦截的方法名,或是 * 所有的方法。rollback-for:将被触发进行回滚的异常 -->
+			<!-- propagation : 事务传播行为默认是 REQUIRED(支持当前事务，如果当前没有事务，就新建一个事务) -->
+			<tx:method name="*" rollback-for="Exception" propagation="REQUIRED" />
+		</tx:attributes>
+	</tx:advice>
+
+	<!-- 配置哪些类的方法需要进行事务管理 -->
+	<!-- proxy-target-class 等于true是基于类的代理 等于false是基于接口的代理 -->
+	<aop:config proxy-target-class="true">
+		<!-- aop:pointcut 要进行切的面,id 的命名规则 模块名+切的面 expression 代表扫描的 地址 -->
+		<aop:pointcut id="servicePointcut"
+			expression="execution(* com.cs.test.service.impl..*.*(..))" />
+		<!-- aop:advisor 就是把上面我们所配置的事务管理两部分属性整合起来作为整个事务管理 -->
+		<aop:advisor pointcut-ref="servicePointcut" advice-ref="serviceAdvice" />
+	</aop:config>
+</beans>
